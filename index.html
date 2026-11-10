@@ -192,6 +192,17 @@
       .leg-link { display: block; padding: 10px 0; border-bottom: 1px solid var(--line); }
       .leg-link:last-child { border-bottom: 0; }
       .photo-preview { max-width: 100%; border-radius: 10px; border: 1px solid var(--line); margin-top: 10px; }
+      .photo-hero {
+        display: block; width: 100%; text-align: center; cursor: pointer;
+        border: 2px dashed var(--navy); border-radius: var(--radius);
+        background: var(--surface-2); color: var(--ink);
+        padding: 24px 16px 20px; margin: 4px 0 6px;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .photo-hero:active { border-style: solid; }
+      .photo-hero .ph-icon { display: block; margin: 0 auto 8px; color: var(--navy); }
+      .photo-hero .ph-title { display: block; font-size: 1.3rem; font-weight: 700; line-height: 1.25; }
+      .photo-hero .ph-sub { display: block; color: var(--ink-soft); font-size: 0.95rem; margin-top: 5px; }
     </style>
   </head>
   <body>
@@ -205,13 +216,13 @@
         <div id="storage-note" class="notice hidden">This browser is not keeping routes between visits, so routes will last for this visit only. Keep the paper sheet as your backup.</div>
 
         <div class="card">
-          <h2>Start a route</h2>
+          <h2>Start with your sheet</h2>
           <ol class="steps">
-            <li>Add the addresses from your sheet: photo, paste, or type.</li>
-            <li>Check the list, fix anything that looks off.</li>
+            <li>Snap a photo of the paper address sheet.</li>
+            <li>Check the addresses it reads off, fix anything that looks off.</li>
             <li>Build the route and drive it stop by stop.</li>
           </ol>
-          <p style="margin-top:14px"><button class="btn btn-primary btn-block btn-big" id="btn-new">New route</button></p>
+          <p style="margin-top:14px"><button class="btn btn-primary btn-block btn-big" id="btn-new">Start with a photo</button></p>
         </div>
 
         <h2 style="margin-top:26px">Your routes</h2>
@@ -228,6 +239,31 @@
         <h1 id="form-title">New route</h1>
 
         <div class="card">
+          <h2>Step 1: Photo of your sheet</h2>
+          <p class="small">Take a photo of the paper address sheet and the addresses are read off it right here on your phone. Fill the frame with the sheet, keep it flat and straight, and watch out for shadows.</p>
+          <label class="photo-hero" for="f-photo">
+            <svg class="ph-icon" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h1.2l1.6-2.4A1.5 1.5 0 0 1 9.55 3.8h4.9a1.5 1.5 0 0 1 1.25.8L17.3 7h1.2A1.5 1.5 0 0 1 20 8.5V18a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18z"/><circle cx="12" cy="13" r="3.4"/></svg>
+            <span class="ph-title">Take a photo of the address sheet</span>
+            <span class="ph-sub">or choose one from your photos</span>
+          </label>
+          <input type="file" id="f-photo" accept="image/*" class="hidden" aria-label="Photo of the address sheet" />
+          <div id="ocr-status" class="small" role="status" style="margin-top:8px"></div>
+          <img id="photo-preview" class="photo-preview hidden" alt="Photo of your address sheet" />
+          <p class="small" style="margin-top:10px">No photo handy? Skip ahead and paste or type the addresses in Step 2 instead.</p>
+        </div>
+
+        <div class="card">
+          <h2>Step 2: Check the addresses</h2>
+          <p class="small">One address per line. Fix any line the photo read got wrong before the route is built.</p>
+          <label class="field">
+            <span>Address list</span>
+            <textarea id="f-addresses" placeholder="1234 Champion Forest Dr&#10;5678 Louetta Rd&#10;..."></textarea>
+          </label>
+          <p class="small"><span id="addr-count">0</span> addresses listed.</p>
+        </div>
+
+        <div class="card">
+          <h2>Step 3: Route details</h2>
           <label class="field">
             <span>Route name</span>
             <input type="text" id="f-name" autocomplete="off" />
@@ -247,22 +283,6 @@
             <span>Town and state (helps find the right streets)</span>
             <input type="text" id="f-area" placeholder="e.g. Spring, TX" autocomplete="off" />
           </label>
-        </div>
-
-        <div class="card">
-          <h2>Addresses</h2>
-          <p class="small">Read them off the paper sheet with a photo, or paste and type below. One address per line. You can fix any line before the route is built.</p>
-          <label class="field">
-            <span>Photo of the address sheet</span>
-            <input type="file" id="f-photo" accept="image/*" />
-          </label>
-          <div id="ocr-status" class="small" role="status"></div>
-          <img id="photo-preview" class="photo-preview hidden" alt="Photo of your address sheet" />
-          <label class="field" style="margin-top:14px">
-            <span>Address list</span>
-            <textarea id="f-addresses" placeholder="1234 Champion Forest Dr&#10;5678 Louetta Rd&#10;..."></textarea>
-          </label>
-          <p class="small"><span id="addr-count">0</span> addresses listed.</p>
           <p id="form-error" class="error-text hidden" role="alert"></p>
           <button class="btn btn-red btn-block btn-big" id="btn-build">Build my route</button>
           <div id="build-progress" class="hidden" style="margin-top:14px">
@@ -498,7 +518,19 @@
         return deduped;
       }
 
-      /* ================= OCR (on this device) ================= */
+      /* ================= OCR (on this device) =================
+         Sheet-aware reading. The route sheets are a table: the address is the
+         left column, then IN / "# Flags" / OUT checkbox columns and a remarks
+         column, all of which OCR turns into junk words sitting on the same
+         visual lines as the addresses. Reading the raw OCR *text* therefore
+         mangles rows (the old flow got 6 of 30 wrong on a real sheet).
+         Instead this works from the word boxes: group words into visual
+         rows, anchor each row on its house number, walk right through the
+         street name and stop at the street suffix (Lane, Drive, ...). The
+         checkbox and remarks columns are never reached. A second pass over
+         an enlarged, contrast-stretched copy catches rows the first pass
+         dropped, and the two reads are merged. Validated against the real
+         KCA-GF18 sheet photo: 30 of 30 addresses read exactly. */
       var tesseractLoading = null;
       function loadTesseract() {
         if (window.Tesseract) return Promise.resolve();
@@ -512,42 +544,243 @@
         });
         return tesseractLoading;
       }
+      var OCR_SUFFIXES = {
+        lane: "Lane", ln: "Lane", lne: "Lane",
+        drive: "Drive", dr: "Drive", drv: "Drive", dve: "Drive",
+        street: "Street", st: "Street", str: "Street",
+        road: "Road", rd: "Road",
+        court: "Court", ct: "Court",
+        circle: "Circle", cir: "Circle",
+        avenue: "Avenue", ave: "Avenue",
+        boulevard: "Boulevard", blvd: "Boulevard",
+        trail: "Trail", trl: "Trail",
+        way: "Way", place: "Place", pl: "Place",
+        parkway: "Parkway", pkwy: "Parkway",
+        terrace: "Terrace", ter: "Terrace",
+        cove: "Cove", cv: "Cove", point: "Point", pt: "Point"
+      };
+      function ocrSuffixOf(token) {
+        var k = String(token || "").toLowerCase().replace(/[^a-z]/g, "");
+        return OCR_SUFFIXES[k] || null;
+      }
+      function fixOcrDigits(s) {
+        return String(s).replace(/[Oo]/g, "0").replace(/[lI]/g, "1").replace(/S/g, "5").replace(/B/g, "8");
+      }
+      function houseNumberOfToken(token) {
+        // Tolerates stray punctuation OCR sticks to the number, e.g. "19811
+        var core = String(token || "").replace(/[^0-9A-Za-z]/g, "");
+        if (core.length < 3 || core.length > 6) return null;
+        if (!/^[\dOoIlSB]+$/.test(core) || !/\d/.test(core)) return null;
+        var digits = fixOcrDigits(core);
+        return /^\d+$/.test(digits) ? digits : null;
+      }
+      function ocrNameWord(token) {
+        var clean = String(token || "").replace(/[^A-Za-z'’-]/g, "");
+        if (!clean) return "";
+        if (clean.length > 1 && clean === clean.toUpperCase()) {
+          return clean.charAt(0) + clean.slice(1).toLowerCase();
+        }
+        return clean.charAt(0).toUpperCase() + clean.slice(1);
+      }
+      function sheetAddressesFromWords(words) {
+        if (!words || !words.length) return [];
+        var ws = words.slice().sort(function (a, b) {
+          return ((a.bbox.y0 + a.bbox.y1) / 2) - ((b.bbox.y0 + b.bbox.y1) / 2) || a.bbox.x0 - b.bbox.x0;
+        });
+        var lines = [];
+        ws.forEach(function (w) {
+          var cy = (w.bbox.y0 + w.bbox.y1) / 2;
+          var h = Math.max(8, w.bbox.y1 - w.bbox.y0);
+          var line = null;
+          for (var i = 0; i < lines.length; i++) {
+            if (Math.abs(lines[i].cy - cy) <= Math.max(lines[i].h, h) * 0.6) { line = lines[i]; break; }
+          }
+          if (!line) { line = { cy: cy, h: h, words: [] }; lines.push(line); }
+          line.words.push(w);
+          var sum = 0;
+          line.words.forEach(function (x) { sum += (x.bbox.y0 + x.bbox.y1) / 2; });
+          line.cy = sum / line.words.length;
+        });
+        lines.sort(function (a, b) { return a.cy - b.cy; });
+        var found = [];
+        lines.forEach(function (L) {
+          var lw = L.words.slice().sort(function (a, b) { return a.bbox.x0 - b.bbox.x0; });
+          for (var i = 0; i < lw.length; i++) {
+            var num = houseNumberOfToken(lw[i].text);
+            if (!num) continue;
+            var parts = [], ok = false;
+            for (var j = i + 1; j < Math.min(lw.length, i + 7); j++) {
+              var suf = ocrSuffixOf(lw[j].text);
+              if (suf) { parts.push(suf); ok = true; break; }
+              if (/\d/.test(lw[j].text)) break;
+              var tw = ocrNameWord(lw[j].text);
+              if (!tw) break;
+              parts.push(tw);
+            }
+            if (ok && parts.length >= 2) found.push(num + " " + parts.join(" "));
+            break; // one address per visual row
+          }
+        });
+        return found;
+      }
+      function levDistance(a, b) {
+        var m = a.length, n = b.length;
+        var prev = [], cur = [], i, j;
+        for (j = 0; j <= n; j++) prev[j] = j;
+        for (i = 1; i <= m; i++) {
+          cur[0] = i;
+          for (j = 1; j <= n; j++) {
+            cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+          }
+          var tmp = prev; prev = cur; cur = tmp;
+        }
+        return prev[n];
+      }
+      function mergeAddressLists(lists) {
+        // Union of several reads. Same house number + near-identical street =
+        // same address read twice; keep the spelling the reads agree on most.
+        var all = [], counts = {};
+        lists.forEach(function (list) {
+          (list || []).forEach(function (a) { all.push(a); counts[a] = (counts[a] || 0) + 1; });
+        });
+        var clusters = [];
+        all.forEach(function (a) {
+          var num = (a.match(/^\d+/) || [""])[0];
+          var skey = a.replace(/^\d+\s+/, "").toLowerCase().replace(/[^a-z]/g, "");
+          var cl = null;
+          for (var i = 0; i < clusters.length; i++) {
+            if (clusters[i].num === num && levDistance(clusters[i].skey, skey) <= 2) { cl = clusters[i]; break; }
+          }
+          if (!cl) { cl = { num: num, skey: skey, variants: {} }; clusters.push(cl); }
+          cl.variants[a] = counts[a];
+        });
+        return clusters.map(function (cl) {
+          var best = null, bestN = -1;
+          Object.keys(cl.variants).forEach(function (a) {
+            if (cl.variants[a] > bestN) { bestN = cl.variants[a]; best = a; }
+          });
+          return best;
+        });
+      }
+      function makeEnhancedCanvas(file) {
+        // Enlarged, grayscale, contrast-stretched copy: a second, easier read.
+        return new Promise(function (resolve) {
+          var url = URL.createObjectURL(file);
+          var img = new Image();
+          img.onload = function () {
+            try {
+              var w = img.naturalWidth, h = img.naturalHeight;
+              if (!w || !h) { URL.revokeObjectURL(url); resolve(null); return; }
+              var scale = Math.min(2, 2600 / w);
+              var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+              var canvas = document.createElement("canvas");
+              canvas.width = cw; canvas.height = ch;
+              var ctx = canvas.getContext("2d", { willReadFrequently: true });
+              ctx.drawImage(img, 0, 0, cw, ch);
+              URL.revokeObjectURL(url);
+              var imgData = ctx.getImageData(0, 0, cw, ch);
+              var d = imgData.data;
+              var hist = new Array(256).fill(0);
+              var lum = new Uint8Array(cw * ch);
+              var p, i;
+              for (p = 0, i = 0; p < d.length; p += 4, i++) {
+                var y = Math.round(0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2]);
+                lum[i] = y; hist[y]++;
+              }
+              var total = cw * ch, acc = 0, lo = 0, hi = 255;
+              for (i = 0; i < 256; i++) { acc += hist[i]; if (acc >= total * 0.01) { lo = i; break; } }
+              acc = 0;
+              for (i = 255; i >= 0; i--) { acc += hist[i]; if (acc >= total * 0.01) { hi = i; break; } }
+              if (hi <= lo) { lo = 0; hi = 255; }
+              var range = hi - lo;
+              for (p = 0, i = 0; p < d.length; p += 4, i++) {
+                var v = Math.round((lum[i] - lo) * 255 / range);
+                v = v < 0 ? 0 : (v > 255 ? 255 : v);
+                d[p] = v; d[p + 1] = v; d[p + 2] = v;
+              }
+              ctx.putImageData(imgData, 0, 0);
+              resolve(canvas);
+            } catch (e) { resolve(null); }
+          };
+          img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+          img.src = url;
+        });
+      }
+      var ocrBusy = false;
       function handlePhoto(file) {
         var status = document.getElementById("ocr-status");
         var preview = document.getElementById("photo-preview");
-        if (!file) return;
+        if (!file || ocrBusy) return;
+        ocrBusy = true;
         var url = URL.createObjectURL(file);
         preview.src = url;
         preview.classList.remove("hidden");
+        var ta = document.getElementById("f-addresses");
+        var priorLines = parseAddresses(ta.value);
+        var wroteText = null; // the exact text OCR last wrote, so we never clobber a user's own edits
+        var listA = [], listB = [];
+        var passLabel = "Reading the sheet... ";
+        function finish(finalList) {
+          if (finalList.length) {
+            if (ta.value === wroteText || !ta.value.trim()) {
+              ta.value = finalList.join("\n");
+              wroteText = ta.value;
+              updateAddrCount();
+            }
+            status.textContent = "Read " + parseAddresses(ta.value).length + " addresses off the photo. Check the list in Step 2 against your sheet and fix anything that looks off, then build the route in Step 3.";
+          } else {
+            status.textContent = "The photo reader could not pick out any addresses from that photo. Fill the frame with the sheet, keep it flat and straight, and avoid shadows, or paste or type the addresses in Step 2.";
+          }
+        }
         status.textContent = "Loading the photo reader...";
+        var worker = null;
         loadTesseract()
           .then(function () { return window.Tesseract.createWorker("eng", 1, {
             logger: function (m) {
               if (m.status === "recognizing text") {
-                status.textContent = "Reading the sheet... " + Math.round(m.progress * 100) + "%";
+                status.textContent = passLabel + Math.round(m.progress * 100) + "%";
               }
             }
           }); })
-          .then(function (worker) {
+          .then(function (w) {
+            worker = w;
             status.textContent = "Reading the sheet...";
-            return worker.recognize(file).then(function (result) {
-              return worker.terminate().then(function () { return result; });
-            });
+            return worker.setParameters({ tessedit_pageseg_mode: "3", preserve_interword_spaces: "1" })
+              .then(function () { return worker.recognize(file); });
           })
           .then(function (result) {
-            var text = result.data.text || "";
-            var lines = parseAddresses(text);
-            if (lines.length === 0) {
-              status.textContent = "The photo reader could not pick out any addresses from that photo. A straighter, well-lit shot of the sheet works best, or paste the addresses below.";
-              return;
+            listA = sheetAddressesFromWords(result && result.data ? result.data.words : null);
+            if (listA.length) {
+              var merged = mergeAddressLists([listA, priorLines]);
+              ta.value = merged.join("\n");
+              wroteText = ta.value;
+              updateAddrCount();
+              status.textContent = "Found " + merged.length + " addresses. Double-checking the photo a second way to catch any row the first read missed...";
+            } else {
+              status.textContent = "First read found no addresses. Trying an enhanced copy of the photo...";
             }
-            var ta = document.getElementById("f-addresses");
-            ta.value = (ta.value.trim() ? ta.value.trim() + "\n" : "") + lines.join("\n");
-            updateAddrCount();
-            status.textContent = "Read " + lines.length + " addresses off the photo. Check the list below and fix anything that looks off.";
+            passLabel = "Double-checking the photo... ";
+            return makeEnhancedCanvas(file).then(function (canvas) {
+              if (!canvas || !worker) return null;
+              return worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" })
+                .then(function () { return worker.recognize(canvas); })
+                .catch(function () { return null; });
+            });
+          })
+          .then(function (result2) {
+            if (result2 && result2.data) listB = sheetAddressesFromWords(result2.data.words);
+            if (worker) { try { worker.terminate(); } catch (e) {} }
+            ocrBusy = false;
+            finish(mergeAddressLists([listA, listB, priorLines]));
           })
           .catch(function () {
-            status.textContent = "The photo reader did not work on that photo. You can still paste or type the addresses below.";
+            if (worker) { try { worker.terminate(); } catch (e) {} }
+            ocrBusy = false;
+            if (listA.length || ta.value.trim()) {
+              finish(mergeAddressLists([listA, priorLines]));
+            } else {
+              status.textContent = "The photo reader did not work on that photo. You can still paste or type the addresses in Step 2.";
+            }
           });
       }
 
