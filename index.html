@@ -169,11 +169,17 @@
       .stop-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
       .stop-actions .btn { min-height: 44px; }
       .stop-check {
-        flex: 0 0 auto; min-height: 44px; min-width: 84px; padding: 8px 12px;
+        flex: 0 0 auto; min-height: 44px; padding: 6px 14px 6px 10px;
+        display: inline-flex; align-items: center; gap: 10px;
         border-radius: 10px; border: 1px solid var(--line);
         background: var(--surface); color: var(--ink); font-weight: 700;
+        cursor: pointer; user-select: none; -webkit-user-select: none;
       }
-      .stop-check[aria-pressed="true"] { background: var(--green-soft); color: var(--green); border-color: var(--green); }
+      .stop-check input[type="checkbox"] {
+        width: 30px; height: 30px; margin: 0; flex: 0 0 auto;
+        accent-color: var(--green); cursor: pointer;
+      }
+      .stop-check.is-on { background: var(--green-soft); color: var(--green); border-color: var(--green); }
       .next-card { border-color: var(--navy); border-width: 2px; }
       .next-addr { font-size: 1.35rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
       .hidden { display: none !important; }
@@ -1428,16 +1434,16 @@
             '<div class="stop-main"><div class="stop-addr">' + esc(s.address) + "</div>" +
             (leg ? '<div class="stop-leg">' + leg + "</div>" : "") + "</div>" +
             '<div class="stop-side">' +
-            '<button class="stop-check" data-check="' + esc(s.id) + '" aria-pressed="' + (s.done ? "true" : "false") + '">' + (s.done ? "Done" : "Check off") + "</button>" +
+            '<label class="stop-check' + (s.done ? " is-on" : "") + '"><input type="checkbox" data-check="' + esc(s.id) + '"' + (s.done ? " checked" : "") + '><span>' + (route.kind === "out" ? "Put out" : "Picked up") + "</span></label>" +
             (singleNav ? '<a class="btn btn-quiet btn-small" href="' + esc(singleNav) + '" target="_blank" rel="noopener" aria-label="Directions to just ' + esc(s.address) + '">Directions</a>' : "") +
             "</div>" +
             "</div>";
         }).join("");
         function wireCheck(scopeEl) {
-          Array.prototype.forEach.call(scopeEl.querySelectorAll("[data-check]"), function (btn) {
-            btn.addEventListener("click", function () {
-              var stop = route.stops.filter(function (s) { return s.id === btn.getAttribute("data-check"); })[0];
-              if (stop) { stop.done = !stop.done; save(); renderRoute(); }
+          Array.prototype.forEach.call(scopeEl.querySelectorAll("[data-check]"), function (box) {
+            box.addEventListener("change", function () {
+              var stop = route.stops.filter(function (s) { return s.id === box.getAttribute("data-check"); })[0];
+              if (stop) { stop.done = box.checked; save(); renderRoute(); }
             });
           });
         }
@@ -1452,7 +1458,7 @@
             return '<div class="stop-row wrap' + (s.done ? " is-done" : "") + '"><div class="stop-main"><div class="stop-addr">' + esc(s.address) + "</div></div>" +
               '<div class="stop-actions">' +
               (singleNav ? '<a class="btn btn-quiet" href="' + esc(singleNav) + '" target="_blank" rel="noopener">Directions to this stop</a>' : "") +
-              '<button class="stop-check" data-check="' + esc(s.id) + '" aria-pressed="' + (s.done ? "true" : "false") + '">' + (s.done ? "Done" : "Check off") + "</button></div></div>";
+              '<label class="stop-check' + (s.done ? " is-on" : "") + '"><input type="checkbox" data-check="' + esc(s.id) + '"' + (s.done ? " checked" : "") + '><span>' + (route.kind === "out" ? "Put out" : "Picked up") + "</span></label></div></div>";
           }).join("");
           wireCheck(document.getElementById("unresolved-list"));
         } else {
